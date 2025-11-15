@@ -1,5 +1,6 @@
 {
-  "edinburgh": "https://seuusuario.github.io/cities/edinburgh.json",
-  "lisbon": "https://seuusuario.github.io/cities/lisbon.json",
-  "paris": "https://seuusuario.github.io/cities/paris.json"
+  "edinburgh": "https://github.com/ArmandoDauer/YourGuide/blob/main/cities/edinburgh.json",
+  "lisbon": "https://github.com/ArmandoDauer/YourGuide/blob/main/cities/lisbon.json",
+  "paris": "https://github.com/ArmandoDauer/YourGuide/blob/main/cities/paris.json"
+
 }
