@@ -1,0 +1,61 @@
+{
+  "city": {
+    "id": "lisbon",
+    "name": "Lisbon",
+    "country": "Portugal",
+    "version": "1.0"
+  },
+
+  "categories": [
+    "Museum",
+    "Historic",
+    "Viewpoint",
+    "Park",
+    "Food & Drink",
+    "Shopping",
+    "Other"
+  ],
+
+  "points": [
+    {
+      "id": "p001",
+      "name": "Castelo de São Jorge",
+      "category": "Historic",
+      "address": "R. de Santa Cruz do Castelo, 1100-129 Lisboa",
+      "lat": 38.713909,
+      "lon": -9.133476
+    },
+    {
+      "id": "p002",
+      "name": "Praça do Comércio",
+      "category": "Historic",
+      "address": "Praça do Comércio, 1100-148 Lisboa",
+      "lat": 38.707750,
+      "lon": -9.136592
+    },
+    {
+      "id": "p003",
+      "name": "Mosteiro dos Jerónimos",
+      "category": "Historic",
+      "address": "Praça do Império 1400-206 Lisboa",
+      "lat": 38.697957,
+      "lon": -9.206420
+    },
+    {
+      "id": "p004",
+      "name": "Miradouro da Senhora do Monte",
+      "category": "Viewpoint",
+      "address": "Largo Monte, 1170-107 Lisboa",
+      "lat": 38.720590,
+      "lon": -9.132247
+    },
+    {
+      "id": "p005",
+      "name": "Elevador de Santa Justa",
+      "category": "Historic",
+      "address": "R. do Ouro, 1150-060 Lisboa",
+      "lat": 38.712147,
+      "lon": -9.139158
+    }
+  ]
+}

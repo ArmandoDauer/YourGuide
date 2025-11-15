@@ -1,0 +1,61 @@
+{
+  "city": {
+    "id": "edinburgh",
+    "name": "Edinburgh",
+    "country": "United Kingdom",
+    "version": "1.0"
+  },
+
+  "categories": [
+    "Museum",
+    "Historic",
+    "Park",
+    "Viewpoint",
+    "Food & Drink",
+    "Shopping",
+    "Other"
+  ],
+
+  "points": [
+    {
+      "id": "p001",
+      "name": "Edinburgh Castle",
+      "category": "Historic",
+      "address": "Castlehill, Edinburgh EH1 2NG",
+      "lat": 55.9486,
+      "lon": -3.1999
+    },
+    {
+      "id": "p002",
+      "name": "Royal Mile",
+      "category": "Shopping",
+      "address": "Royal Mile, Edinburgh",
+      "lat": 55.9491,
+      "lon": -3.1900
+    },
+    {
+      "id": "p003",
+      "name": "Arthur's Seat",
+      "category": "Viewpoint",
+      "address": "Holyrood Park, Edinburgh",
+      "lat": 55.9440,
+      "lon": -3.1615
+    },
+    {
+      "id": "p004",
+      "name": "National Museum of Scotland",
+      "category": "Museum",
+      "address": "Chambers St, Edinburgh EH1 1JF",
+      "lat": 55.9475,
+      "lon": -3.1890
+    },
+    {
+      "id": "p005",
+      "name": "Princes Street Gardens",
+      "category": "Park",
+      "address": "Princes St, Edinburgh",
+      "lat": 55.9482,
+      "lon": -3.1955
+    }
+  ]
+}

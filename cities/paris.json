@@ -1,0 +1,62 @@
+{
+  "city": {
+    "id": "paris",
+    "name": "Paris",
+    "country": "France",
+    "version": "1.0"
+  },
+
+  "categories": [
+    "Museum",
+    "Historic",
+    "Monument",
+    "Viewpoint",
+    "Park",
+    "Food & Drink",
+    "Shopping",
+    "Other"
+  ],
+
+  "points": [
+    {
+      "id": "p001",
+      "name": "Tour Eiffel",
+      "category": "Monument",
+      "address": "Champ de Mars, 5 Av. Anatole France, 75007 Paris",
+      "lat": 48.858370,
+      "lon": 2.294481
+    },
+    {
+      "id": "p002",
+      "name": "Musée du Louvre",
+      "category": "Museum",
+      "address": "Rue de Rivoli, 75001 Paris",
+      "lat": 48.860611,
+      "lon": 2.337644
+    },
+    {
+      "id": "p003",
+      "name": "Cathédrale Notre-Dame",
+      "category": "Historic",
+      "address": "6 Parvis Notre-Dame - Pl. Jean-Paul II, 75004 Paris",
+      "lat": 48.852968,
+      "lon": 2.349902
+    },
+    {
+      "id": "p004",
+      "name": "Arc de Triomphe",
+      "category": "Monument",
+      "address": "Pl. Charles de Gaulle, 75008 Paris",
+      "lat": 48.873792,
+      "lon": 2.295028
+    },
+    {
+      "id": "p005",
+      "name": "Sacré-Cœur",
+      "category": "Historic",
+      "address": "35 Rue du Chevalier de la Barre, 75018 Paris",
+      "lat": 48.886704,
+      "lon": 2.343104
+    }
+  ]
+}

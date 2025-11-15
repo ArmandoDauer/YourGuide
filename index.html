@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>City Points → Map (standalone)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-sA+e2GkM2b8b1xgk0vZbP6kQYJgqvYhZ+8m2Qm0Gg6A=" crossorigin=""/>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0; padding:12px; }
+    .container { max-width:1100px; margin:0 auto; display:grid; grid-template-columns:320px 1fr; gap:12px; }
+    .panel { border:1px solid #ddd; padding:10px; border-radius:6px; background:#fff; }
+    label { display:block; font-weight:600; margin-bottom:6px; }
+    select,input,button,textarea { font:inherit; }
+    .points-list { max-height:340px; overflow:auto; margin-bottom:8px; }
+    .points-list li { display:flex; gap:8px; padding:6px 4px; border-bottom:1px solid #f0f0f0; }
+    .points-list li:last-child { border-bottom:0; }
+    #map { height:640px; border-radius:6px; }
+    .small { font-size:12px; color:#444; }
+    .muted { color:#666; font-size:12px; }
+    .row { display:flex; gap:8px; align-items:center; }
+    .nowrap { white-space:nowrap; }
+  </style>
+</head>
+<body>
+  <h1>City Points → Map (standalone)</h1>
+  <div class="container">
+    <div class="panel">
+      <div>
+        <label for="city-select">Select city</label>
+        <select id="city-select"><option value="">-- escolha --</option></select>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="small">Points</div>
+        <ul id="points" class="points-list"></ul>
+      </div>
+
+      <form id="add-form" class="panel" style="margin-top:8px; padding:8px;">
+        <div><label for="pname">Name</label><input id="pname" required style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;"/></div>
+        <div style="margin-top:6px"><label for="pcat">Category</label><input id="pcat" style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;"/></div>
+        <div style="margin-top:6px"><label for="paddr">Address</label><input id="paddr" required style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;"/></div>
+        <div style="margin-top:8px; display:flex; gap:6px;"><button id="add-btn">Add point</button><div id="add-status" class="muted"></div></div>
+        <div class="muted" style="margin-top:8px">Geocoding via Nominatim (OpenStreetMap). Throttled to avoid service abuse.</div>
+      </form>
+
+      <div class="panel" style="margin-top:8px;">
+        <div class="small">Shareable link (auto-updates)</div>
+        <input id="share-url" style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;margin-top:6px;" readonly />
+        <div class="muted" style="margin-top:6px">Copie e compartilhe. A URL inclui a cidade, seleção e pontos adicionados codificados em base64 no parâmetro <code>data</code>.</div>
+      </div>
+    </div>
+
+    <div>
+      <div id="map" class="panel"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o9N1j7fxt3g8gk3l9gYf1Q1r6rS6Gk3lHf2gk3lHf2g=" crossorigin=""></script>
+  <script>
+    // Standalone single-file implementation
+    // Sample cities: change urls to point to real JSON files hosted where CORS allows fetching
+    const SAMPLE_CITIES = [
+      { id: 'edinburgh', name: 'Edinburgh', url: 'https://armandodauer.github.io/LarasGuideEdimburgh/edinburgh.json' },
+      { id: 'local-sample', name: 'Sample (embedded)', url: null }
+    ];
+
+    // Embedded sample JSON for local-sample to allow testing without external fetch
+    const EMBEDDED_SAMPLE = {
+      city: { id: 'local-sample', name: 'Sample City', country: 'Nowhere', version: '1.0' },
+      categories: ['Museum','Historic','Park','Food & Drink','Viewpoint','Shopping','Other'],
+      points: [
+        { id: 'p001', name: 'Sample Castle', category: 'Historic', address: '1 Castle Rd', lat: 51.505, lon: -0.09 },
+        { id: 'p002', name: 'Sample Park', category: 'Park', address: '2 Park Ave', lat: 51.51, lon: -0.1 }
+      ]
+    };
+
+    // Utilities: base64 encode/decode JSON (URL-safe via encodeURIComponent fallback)
+    function base64Encode(obj){ return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); }
+    function base64Decode(s){ try{ return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){return null;} }
+
+    // DOM refs
+    const citySelect = document.getElementById('city-select');
+    const pointsList = document.getElementById('points');
+    const pname = document.getElementById('pname');
+    const pcat = document.getElementById('pcat');
+    const paddr = document.getElementById('paddr');
+    const addBtn = document.getElementById('add-btn');
+    const addStatus = document.getElementById('add-status');
+    const shareUrl = document.getElementById('share-url');
+
+    // State
+    let cityUrl = null; let cityJson = null; let points = []; let userPoints = []; let selectedIds = [];
+    let nominatimLast = 0; const NOMINATIM_THROTTLE = 1200;
+
+    // Map init
+    const map = L.map('map', { center: [51.505, -0.09], zoom: 13 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    let markerGroup = L.layerGroup().addTo(map);
+
+    // Populate city selector
+    SAMPLE_CITIES.forEach(c => {
+      const opt = document.createElement('option'); opt.value = c.url || c.id; opt.textContent = c.name; citySelect.appendChild(opt);
+    });
+
+    // URL param handling
+    function readParamData(){ const p = new URLSearchParams(window.location.search); const raw = p.get('data'); if(!raw) return null; return base64Decode(raw); }
+    function writeParamData(payload){ const enc = base64Encode(payload); const u = new URL(window.location.href); u.searchParams.set('data', enc); window.history.replaceState({}, '', u.toString()); shareUrl.value = u.toString(); }
+
+    // Load city JSON (or embedded) and apply state from URL if present
+    async function loadCity(urlOrId, fromParamData){
+      cityUrl = urlOrId; cityJson = null; points = []; selectedIds = []; userPoints = [];
+      pointsList.innerHTML = '';
+      if(!urlOrId) return;
+      try{
+        if(urlOrId === 'local-sample' || urlOrId === null){ cityJson = EMBEDDED_SAMPLE; }
+        else{
+          const r = await fetch(urlOrId); if(!r.ok) throw new Error('fetch failed'); cityJson = await r.json();
+        }
+        points = (cityJson.points || []).map(p=>({...p}));
+        // populate categories suggestion
+        const cats = (cityJson.categories && cityJson.categories.slice()) || [];
+        pcat.value = cats[0] || 'Other';
+        renderPoints();
+
+        // if params provided and fromParamData contains matching cityUrl, restore selection and user points
+        if(fromParamData && fromParamData.cityUrl && fromParamData.cityUrl === cityUrl){
+          selectedIds = fromParamData.selectedIds || [];
+          userPoints = (fromParamData.userPoints || []).map(p=>({...p}));
+          // merge userPoints into points for rendering but keep them separate in state
+          renderPoints();
+        } else {
+          // if param data exists but for a different city, allow loading it (handled elsewhere)
+        }
+      }catch(e){ console.warn('city load fail',e); cityJson = null; points = []; renderPoints(); }
+    }
+
+    function renderPoints(){
+      pointsList.innerHTML = '';
+      const combined = [...points, ...userPoints];
+      combined.forEach(p => {
+        const li = document.createElement('li');
+        const chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = selectedIds.includes(p.id);
+        chk.addEventListener('change', ()=>{
+          if(chk.checked) selectedIds.push(p.id); else selectedIds = selectedIds.filter(x=>x!==p.id);
+          updateShare(); renderMap();
+        });
+        const info = document.createElement('div'); info.innerHTML = `<div style="font-weight:600">${escapeHtml(p.name)}</div><div class='muted'>${escapeHtml(p.category||'')} — ${escapeHtml(p.address||'')}</div>`;
+        li.appendChild(chk); li.appendChild(info); pointsList.appendChild(li);
+      });
+      updateShare(); renderMap();
+    }
+
+    function renderMap(){
+      markerGroup.clearLayers();
+      const combined = [...points, ...userPoints].filter(p => selectedIds.includes(p.id));
+      if(combined.length===0){ map.setView([51.505,-0.09],13); return; }
+      const fg = L.featureGroup();
+      combined.forEach(p=>{
+        const m = L.marker([p.lat, p.lon]).bindPopup(`<b>${escapeHtml(p.name)}</b><div class='muted'>${escapeHtml(p.category||'')}<br/>${escapeHtml(p.address||'')}</div>`);
+        markerGroup.addLayer(m); fg.addLayer(m);
+      });
+      map.fitBounds(fg.getBounds().pad(0.2));
+    }
+
+    function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'})[c]); }
+
+    async function geocodeAddress(q){ const now = Date.now(); const elapsed = now - nominatimLast; if(elapsed < NOMINATIM_THROTTLE) await new Promise(r=>setTimeout(r, NOMINATIM_THROTTLE - elapsed)); nominatimLast = Date.now();
+      const url = new URL('https://nominatim.openstreetmap.org/search'); url.searchParams.set('q', q); url.searchParams.set('format','json'); url.searchParams.set('limit','1');
+      const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } }); if(!res.ok) return null; const data = await res.json(); if(!data || data.length===0) return null; return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), display_name: data[0].display_name };
+    }
+
+    addBtn.addEventListener('click', async (e)=>{
+      e.preventDefault(); const name = pname.value.trim(); const cat = pcat.value.trim() || 'Other'; const addr = paddr.value.trim(); if(!name||!addr){ addStatus.textContent = 'name and address required'; return; }
+      addStatus.textContent = 'geocoding...'; addBtn.disabled = true;
+      const geo = await geocodeAddress(addr);
+      if(!geo){ addStatus.textContent = 'address not found'; addBtn.disabled = false; setTimeout(()=>addStatus.textContent='',1200); return; }
+      const id = 'u_' + Date.now(); const newP = { id, name, category:cat, address: geo.display_name||addr, lat: geo.lat, lon: geo.lon, source:{type:'user'} };
+      userPoints.push(newP); selectedIds.push(id); renderPoints(); addStatus.textContent = 'added'; addBtn.disabled = false; pname.value=''; paddr.value=''; setTimeout(()=>addStatus.textContent='',900);
+    });
+
+    // when city select changes
+    citySelect.addEventListener('change', ()=>{
+      const val = citySelect.value;
+      // if value matches an actual URL in SAMPLE_CITIES, use that; else use id (embedded)
+      const matched = SAMPLE_CITIES.find(c=> (c.url||c.id) === val);
+      if(matched){
+        const url = matched.url || matched.id;
+        // If current URL contains data param that matches this city url, load with param restore
+        const param = readParamData(); if(param && param.cityUrl && param.cityUrl === url){ loadCity(url, param); }
+        else loadCity(url, null);
+      } else loadCity(null);
+    });
+
+    // Update share URL to encode current state
+    function updateShare(){
+      if(!citySelect.value) { shareUrl.value = window.location.href; return; }
+      const payload = { cityUrl: citySelect.value, selectedIds, userPoints };
+      writeParamData(payload);
+    }
+
+    // On page load, check for data param
+    (function init(){
+      const param = readParamData(); if(param && param.cityUrl){
+        // try find matching sample; if it's an exact url that matches sample, select that; otherwise set citySelect to that value and attempt fetch
+        const found = SAMPLE_CITIES.find(c=> (c.url && c.url===param.cityUrl) || (c.id && c.id===param.cityUrl));
+        if(found){ citySelect.value = found.url || found.id; loadCity(found.url || found.id, param); }
+        else { // unknown url: set select to empty and attempt to load remote
+          // attempt remote load
+          citySelect.value = param.cityUrl; loadCity(param.cityUrl, param);
+        }
+      } else {
+        // default to local sample
+        citySelect.value = 'local-sample'; loadCity('local-sample', null);
+      }
+      updateShare();
+    })();
+
+  </script>
+</body>
+</html>
+
+<!-- Full dynamic implementation added -->
+<script>
+const citiesIndexUrl = "https://seuusuario.github.io/cities/index.json";
+
+let cityData = null;
+let selectedPoints = [];
+
+async function loadCities() {
+  const res = await fetch(citiesIndexUrl);
+  const data = await res.json();
+  const select = document.getElementById('city-select');
+  select.innerHTML = '<option value="">Select a city</option>';
+  for (const [id, url] of Object.entries(data)) {
+    const opt = document.createElement('option');
+    opt.value = url;
+    opt.textContent = id;
+    select.appendChild(opt);
+  }
+}
+
+async function loadCityData(url) {
+  const res = await fetch(url);
+  cityData = await res.json();
+  renderPointsList();
+}
+
+function renderPointsList() {
+  const container = document.getElementById('points-list');
+  container.innerHTML = '';
+  cityData.points.forEach(p => {
+    const div = document.createElement('div');
+    const id = 'pt_' + p.id;
+    div.innerHTML = `<input type="checkbox" id="${id}" data-lat="${p.lat}" data-lon="${p.lon}" data-name="${p.name}"> <label for="${id}">${p.name}</label>`;
+    container.appendChild(div);
+    document.getElementById(id).addEventListener('change', updateSelection);
+  });
+}
+
+function updateSelection() {
+  selectedPoints = Array.from(document.querySelectorAll('#points-list input:checked')).map(i => ({
+    name: i.dataset.name,
+    lat: parseFloat(i.dataset.lat),
+    lon: parseFloat(i.dataset.lon)
+  }));
+}
+
+async function addCustomPoint() {
+  const name = document.getElementById('new-name').value;
+  const category = document.getElementById('new-category').value;
+  const address = document.getElementById('new-address').value;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data[0]) return;
+
+  const lat = parseFloat(data[0].lat);
+  const lon = parseFloat(data[0].lon);
+
+  selectedPoints.push({ name, lat, lon });
+
+  alert('Added');
+}
+
+function generateMapLink() {
+  const base = location.origin + location.pathname;
+  const params = new URLSearchParams();
+  params.set('city', cityData.city.id);
+  params.set('pts', JSON.stringify(selectedPoints));
+  const finalUrl = base + '?' + params.toString();
+  document.getElementById('output-link').textContent = finalUrl;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadCities();
+  document.getElementById('city-select').addEventListener('change', e => loadCityData(e.target.value));
+  document.getElementById('add-point-btn').addEventListener('click', addCustomPoint);
+  document.getElementById('gen-map-btn').addEventListener('click', generateMapLink);
+});
+</script>
